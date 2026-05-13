@@ -306,9 +306,9 @@ fn record_activation(stats_path: &std::path::Path, config: &core::AppConfig, kin
         ReminderKind::Work => Some(core::ActivityKind::Movement),
     };
 
-    if let Some(activity) = activity {
-        if let Err(error) = core::record_activity(stats_path, activity) {
-            log::warn!("cannot record activity: {error:#}");
-        }
+    if let Some(activity) = activity
+        && let Err(error) = core::record_activity(stats_path, activity)
+    {
+        log::warn!("cannot record activity: {error:#}");
     }
 }

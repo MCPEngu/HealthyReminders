@@ -1,44 +1,45 @@
 use std::{
     path::{Path, PathBuf},
     sync::{
+        Mutex, MutexGuard, OnceLock,
         atomic::{AtomicUsize, Ordering},
         mpsc::{self, Sender},
-        Mutex, MutexGuard, OnceLock,
     },
     time::Duration,
 };
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 use windows::{
-    core::PCWSTR,
     Win32::{
         Foundation::{BOOL, HINSTANCE, HWND, LPARAM, LRESULT, RECT, WPARAM},
         Graphics::Gdi::{
-            CreateFontW, GetMonitorInfoW, GetStockObject, GetSysColorBrush, InvalidateRect,
-            MonitorFromWindow, COLOR_WINDOW, DEFAULT_GUI_FONT, MONITORINFO,
-            MONITOR_DEFAULTTONEAREST,
+            COLOR_WINDOW, CreateFontW, DEFAULT_GUI_FONT, GetMonitorInfoW, GetStockObject,
+            GetSysColorBrush, InvalidateRect, MONITOR_DEFAULTTONEAREST, MONITORINFO,
+            MonitorFromWindow,
         },
         System::LibraryLoader::GetModuleHandleW,
         UI::{
             HiDpi::GetDpiForWindow,
             Shell::ShellExecuteW,
             WindowsAndMessaging::{
-                AppendMenuW, CreateMenu, CreateWindowExW, DefWindowProcW, DestroyMenu, DrawMenuBar,
-                GetDlgItem, GetDlgItemTextW, GetMenu, GetWindowRect, LoadCursorW, LoadIconW,
-                MessageBoxW, RegisterClassW, SendMessageW, SetForegroundWindow, SetMenu,
-                SetWindowPos, SetWindowTextW, ShowWindow, BM_GETCHECK, BM_SETCHECK,
-                BS_AUTOCHECKBOX, BS_DEFPUSHBUTTON, BS_OWNERDRAW, CW_USEDEFAULT, ES_NUMBER, HMENU,
-                IDC_ARROW, MB_ICONERROR, MB_ICONINFORMATION, MB_OK, MENU_ITEM_FLAGS, MF_OWNERDRAW,
-                MF_POPUP, MF_SEPARATOR, MF_STRING, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE,
-                SWP_NOZORDER, SWP_SHOWWINDOW, SW_HIDE, SW_SHOW, WINDOW_EX_STYLE, WINDOW_STYLE,
-                WM_CLOSE, WM_COMMAND, WM_CTLCOLORBTN, WM_CTLCOLOREDIT, WM_CTLCOLORSTATIC,
-                WM_DPICHANGED, WM_DRAWITEM, WM_ERASEBKGND, WM_EXITSIZEMOVE, WM_MEASUREITEM,
-                WM_NCACTIVATE, WM_NCPAINT, WM_SETFONT, WM_SETTINGCHANGE, WM_THEMECHANGED,
-                WNDCLASSW, WS_BORDER, WS_CAPTION, WS_CHILD, WS_CLIPCHILDREN, WS_CLIPSIBLINGS,
-                WS_MINIMIZEBOX, WS_OVERLAPPED, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
+                AppendMenuW, BM_GETCHECK, BM_SETCHECK, BS_AUTOCHECKBOX, BS_DEFPUSHBUTTON,
+                BS_OWNERDRAW, CW_USEDEFAULT, CreateMenu, CreateWindowExW, DefWindowProcW,
+                DestroyMenu, DrawMenuBar, ES_NUMBER, GetDlgItem, GetDlgItemTextW, GetMenu,
+                GetWindowRect, HMENU, IDC_ARROW, LoadCursorW, LoadIconW, MB_ICONERROR,
+                MB_ICONINFORMATION, MB_OK, MENU_ITEM_FLAGS, MF_OWNERDRAW, MF_POPUP, MF_SEPARATOR,
+                MF_STRING, MessageBoxW, RegisterClassW, SW_HIDE, SW_SHOW, SWP_NOACTIVATE,
+                SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, SWP_SHOWWINDOW, SendMessageW,
+                SetForegroundWindow, SetMenu, SetWindowPos, SetWindowTextW, ShowWindow,
+                WINDOW_EX_STYLE, WINDOW_STYLE, WM_CLOSE, WM_COMMAND, WM_CTLCOLORBTN,
+                WM_CTLCOLOREDIT, WM_CTLCOLORSTATIC, WM_DPICHANGED, WM_DRAWITEM, WM_ERASEBKGND,
+                WM_EXITSIZEMOVE, WM_MEASUREITEM, WM_NCACTIVATE, WM_NCPAINT, WM_SETFONT,
+                WM_SETTINGCHANGE, WM_THEMECHANGED, WNDCLASSW, WS_BORDER, WS_CAPTION, WS_CHILD,
+                WS_CLIPCHILDREN, WS_CLIPSIBLINGS, WS_MINIMIZEBOX, WS_OVERLAPPED, WS_SYSMENU,
+                WS_TABSTOP, WS_VISIBLE,
             },
         },
     },
+    core::PCWSTR,
 };
 
 use crate::{
@@ -53,10 +54,10 @@ mod text;
 mod theme;
 
 use ids::*;
-use pages::{page_control_ids, page_from_index, page_from_nav_id, SettingsPage, ALL_PAGE_IDS};
+use pages::{ALL_PAGE_IDS, SettingsPage, page_control_ids, page_from_index, page_from_nav_id};
 use text::{
-    about_text, about_title, glass_label, settings_menu_title, settings_text, test_success_text,
-    water_chart_text, water_logged_text, SettingsMenuTitle,
+    SettingsMenuTitle, about_text, about_title, glass_label, settings_menu_title, settings_text,
+    test_success_text, water_chart_text, water_logged_text,
 };
 
 static SETTINGS: OnceLock<Mutex<Option<SettingsState>>> = OnceLock::new();
@@ -2012,11 +2013,12 @@ unsafe extern "system" fn settings_wnd_proc(
     wparam: WPARAM,
     lparam: LPARAM,
 ) -> LRESULT {
-    match std::panic::catch_unwind(|| settings_wnd_proc_inner(hwnd, msg, wparam, lparam)) {
+    match std::panic::catch_unwind(|| unsafe { settings_wnd_proc_inner(hwnd, msg, wparam, lparam) })
+    {
         Ok(result) => result,
         Err(_) => {
             log::error!("settings window procedure panicked");
-            DefWindowProcW(hwnd, msg, wparam, lparam)
+            unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) }
         }
     }
 }
@@ -2093,7 +2095,7 @@ unsafe fn settings_wnd_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                     }
                 }
                 ID_HIDE => {
-                    let _ = ShowWindow(hwnd, SW_HIDE);
+                    let _ = unsafe { ShowWindow(hwnd, SW_HIDE) };
                     core::trim_memory();
                 }
                 _ => {}
@@ -2101,7 +2103,7 @@ unsafe fn settings_wnd_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
             return LRESULT(0);
         }
         WM_CLOSE => {
-            let _ = ShowWindow(hwnd, SW_HIDE);
+            let _ = unsafe { ShowWindow(hwnd, SW_HIDE) };
             core::trim_memory();
             return LRESULT(0);
         }
@@ -2110,7 +2112,7 @@ unsafe fn settings_wnd_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
             return LRESULT(0);
         }
         WM_NCACTIVATE | WM_NCPAINT => {
-            let result = DefWindowProcW(hwnd, msg, wparam, lparam);
+            let result = unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) };
             theme::draw_menu_bar(hwnd, msg, lparam, current_theme(hwnd));
             return result;
         }
@@ -2160,7 +2162,7 @@ unsafe fn settings_wnd_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
         _ => {}
     }
 
-    DefWindowProcW(hwnd, msg, wparam, lparam)
+    unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) }
 }
 
 fn apply_theme(hwnd: HWND) {
@@ -2189,33 +2191,30 @@ fn current_theme(hwnd: HWND) -> core::ThemeMode {
 }
 
 fn update_cached_appearance(theme: core::ThemeMode, language: core::Language) {
-    if let Some(lock) = SETTINGS.get() {
-        if let Ok(mut guard) = lock.lock() {
-            if let Some(state) = guard.as_mut() {
-                state.theme = theme;
-                state.language = language;
-            }
-        }
+    if let Some(lock) = SETTINGS.get()
+        && let Ok(mut guard) = lock.lock()
+        && let Some(state) = guard.as_mut()
+    {
+        state.theme = theme;
+        state.language = language;
     }
 }
 
 fn update_cached_theme(theme: core::ThemeMode) {
-    if let Some(lock) = SETTINGS.get() {
-        if let Ok(mut guard) = lock.lock() {
-            if let Some(state) = guard.as_mut() {
-                state.theme = theme;
-            }
-        }
+    if let Some(lock) = SETTINGS.get()
+        && let Ok(mut guard) = lock.lock()
+        && let Some(state) = guard.as_mut()
+    {
+        state.theme = theme;
     }
 }
 
 fn update_cached_language(language: core::Language) {
-    if let Some(lock) = SETTINGS.get() {
-        if let Ok(mut guard) = lock.lock() {
-            if let Some(state) = guard.as_mut() {
-                state.language = language;
-            }
-        }
+    if let Some(lock) = SETTINGS.get()
+        && let Ok(mut guard) = lock.lock()
+        && let Some(state) = guard.as_mut()
+    {
+        state.language = language;
     }
 }
 
@@ -2418,10 +2417,11 @@ fn read_hhmm(parent: HWND, id: i32, fallback: u16) -> u16 {
     if let Some((hour, minute)) = text.split_once(':') {
         let parsed_hour = hour.trim().parse::<u16>();
         let parsed_minute = minute.trim().parse::<u16>();
-        if let (Ok(hour), Ok(minute)) = (parsed_hour, parsed_minute) {
-            if hour < 24 && minute < 60 {
-                return hour * 60 + minute;
-            }
+        if let (Ok(hour), Ok(minute)) = (parsed_hour, parsed_minute)
+            && hour < 24
+            && minute < 60
+        {
+            return hour * 60 + minute;
         }
         return fallback.min(1439);
     }

@@ -1,34 +1,34 @@
 use std::sync::{
-    atomic::{AtomicBool, Ordering},
     OnceLock,
+    atomic::{AtomicBool, Ordering},
 };
 
 use windows::{
-    core::{PCWSTR, PWSTR},
     Win32::{
         Foundation::{BOOL, COLORREF, HWND, LPARAM, LRESULT, POINT, RECT, WPARAM},
         Graphics::{
-            Dwm::{DwmSetWindowAttribute, DWMWA_USE_IMMERSIVE_DARK_MODE},
+            Dwm::{DWMWA_USE_IMMERSIVE_DARK_MODE, DwmSetWindowAttribute},
             Gdi::{
-                CreateSolidBrush, DrawTextW, FillRect, FrameRect, GetWindowDC, InvalidateRect,
-                MapWindowPoints, OffsetRect, ReleaseDC, SelectObject, SetBkColor, SetBkMode,
-                SetTextColor, UpdateWindow, DT_CENTER, DT_HIDEPREFIX, DT_NOPREFIX, DT_SINGLELINE,
-                DT_VCENTER, HBRUSH, HDC, HGDIOBJ, OPAQUE, TRANSPARENT,
+                CreateSolidBrush, DT_CENTER, DT_HIDEPREFIX, DT_NOPREFIX, DT_SINGLELINE, DT_VCENTER,
+                DrawTextW, FillRect, FrameRect, GetWindowDC, HBRUSH, HDC, HGDIOBJ, InvalidateRect,
+                MapWindowPoints, OPAQUE, OffsetRect, ReleaseDC, SelectObject, SetBkColor,
+                SetBkMode, SetTextColor, TRANSPARENT, UpdateWindow,
             },
         },
         UI::{
             Controls::{
-                SetWindowTheme, DRAWITEMSTRUCT, MEASUREITEMSTRUCT, ODS_DISABLED, ODS_GRAYED,
-                ODS_HOTLIGHT, ODS_NOACCEL, ODS_SELECTED, ODT_BUTTON, ODT_MENU,
+                DRAWITEMSTRUCT, MEASUREITEMSTRUCT, ODS_DISABLED, ODS_GRAYED, ODS_HOTLIGHT,
+                ODS_NOACCEL, ODS_SELECTED, ODT_BUTTON, ODT_MENU, SetWindowTheme,
             },
             WindowsAndMessaging::{
                 DrawMenuBar, GetClientRect, GetDlgCtrlID, GetDlgItem, GetMenu, GetMenuBarInfo,
-                GetMenuItemInfoW, GetWindowRect, GetWindowTextW, SetMenuInfo, HMENU, MENUBARINFO,
-                MENUINFO, MENUITEMINFOW, MIIM_STRING, MIM_APPLYTOSUBMENUS, MIM_BACKGROUND,
-                MIM_STYLE, MNS_NOCHECK, OBJID_MENU, WM_NCACTIVATE, WM_NCPAINT,
+                GetMenuItemInfoW, GetWindowRect, GetWindowTextW, HMENU, MENUBARINFO, MENUINFO,
+                MENUITEMINFOW, MIIM_STRING, MIM_APPLYTOSUBMENUS, MIM_BACKGROUND, MIM_STYLE,
+                MNS_NOCHECK, OBJID_MENU, SetMenuInfo, WM_NCACTIVATE, WM_NCPAINT,
             },
         },
     },
+    core::{PCWSTR, PWSTR},
 };
 
 use crate::core;

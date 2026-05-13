@@ -12,37 +12,36 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 use chrono::{Duration as ChronoDuration, Local, NaiveDate, Timelike};
 use flexi_logger::{Cleanup, Criterion, Duplicate, FileSpec, Logger, Naming, WriteMode};
-use notify::{recommended_watcher, Event, RecursiveMode, Watcher};
+use notify::{Event, RecursiveMode, Watcher, recommended_watcher};
 use serde::{Deserialize, Serialize};
 use windows::{
-    core::{ComInterface, PCWSTR, PWSTR},
     Win32::{
         Foundation::{
-            CloseHandle, GetLastError, BOOL, ERROR_ALREADY_EXISTS, HANDLE, RPC_E_CHANGED_MODE,
+            BOOL, CloseHandle, ERROR_ALREADY_EXISTS, GetLastError, HANDLE, RPC_E_CHANGED_MODE,
         },
-        Storage::FileSystem::{MoveFileExW, MOVEFILE_REPLACE_EXISTING, MOVEFILE_WRITE_THROUGH},
+        Storage::FileSystem::{MOVEFILE_REPLACE_EXISTING, MOVEFILE_WRITE_THROUGH, MoveFileExW},
         System::{
             Com::StructuredStorage::{
                 PROPVARIANT, PROPVARIANT_0, PROPVARIANT_0_0, PROPVARIANT_0_0_0,
             },
             Com::{
-                CoCreateInstance, CoInitializeEx, CoUninitialize, IPersistFile,
                 CLSCTX_INPROC_SERVER, COINIT_APARTMENTTHREADED, COINIT_MULTITHREADED,
+                CoCreateInstance, CoInitializeEx, CoUninitialize, IPersistFile,
             },
             ProcessStatus::EmptyWorkingSet,
             Registry::{
-                RegCloseKey, RegDeleteValueW, RegOpenKeyExW, RegQueryValueExW, RegSetValueExW,
                 HKEY, HKEY_CURRENT_USER, KEY_QUERY_VALUE, KEY_SET_VALUE, REG_DWORD, REG_SZ,
-                REG_VALUE_TYPE,
+                REG_VALUE_TYPE, RegCloseKey, RegDeleteValueW, RegOpenKeyExW, RegQueryValueExW,
+                RegSetValueExW,
             },
             Threading::{
-                CreateEventW, CreateMutexW, GetCurrentProcess, OpenEventW, ProcessPowerThrottling,
-                SetEvent, SetProcessInformation, EVENT_MODIFY_STATE,
+                CreateEventW, CreateMutexW, EVENT_MODIFY_STATE, GetCurrentProcess, OpenEventW,
                 PROCESS_POWER_THROTTLING_CURRENT_VERSION, PROCESS_POWER_THROTTLING_EXECUTION_SPEED,
-                PROCESS_POWER_THROTTLING_STATE,
+                PROCESS_POWER_THROTTLING_STATE, ProcessPowerThrottling, SetEvent,
+                SetProcessInformation,
             },
             Variant::VT_LPWSTR,
         },
@@ -52,6 +51,7 @@ use windows::{
             SetCurrentProcessExplicitAppUserModelID, ShellLink,
         },
     },
+    core::{ComInterface, PCWSTR, PWSTR},
 };
 
 pub const APP_NAME: &str = "HealthyReminders";
@@ -1193,26 +1193,26 @@ fn normalize_stats(mut stats: AppStats) -> AppStats {
     stats.days.sort_by(|left, right| left.date.cmp(&right.date));
     let mut merged = Vec::<DailyStats>::with_capacity(stats.days.len().min(60));
     for day in stats.days {
-        if let Some(last) = merged.last_mut() {
-            if last.date == day.date {
-                last.water_ml = last
-                    .water_ml
-                    .saturating_add(day.water_ml)
-                    .min(MAX_DAILY_WATER_ML);
-                last.water_glasses = last
-                    .water_glasses
-                    .saturating_add(day.water_glasses)
-                    .min(MAX_DAILY_COUNT);
-                last.eye_rest_completed = last
-                    .eye_rest_completed
-                    .saturating_add(day.eye_rest_completed)
-                    .min(MAX_DAILY_COUNT);
-                last.movement_completed = last
-                    .movement_completed
-                    .saturating_add(day.movement_completed)
-                    .min(MAX_DAILY_COUNT);
-                continue;
-            }
+        if let Some(last) = merged.last_mut()
+            && last.date == day.date
+        {
+            last.water_ml = last
+                .water_ml
+                .saturating_add(day.water_ml)
+                .min(MAX_DAILY_WATER_ML);
+            last.water_glasses = last
+                .water_glasses
+                .saturating_add(day.water_glasses)
+                .min(MAX_DAILY_COUNT);
+            last.eye_rest_completed = last
+                .eye_rest_completed
+                .saturating_add(day.eye_rest_completed)
+                .min(MAX_DAILY_COUNT);
+            last.movement_completed = last
+                .movement_completed
+                .saturating_add(day.movement_completed)
+                .min(MAX_DAILY_COUNT);
+            continue;
         }
         merged.push(day);
     }

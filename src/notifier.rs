@@ -5,10 +5,10 @@ use std::{
 
 use anyhow::{Context, Result};
 use windows::{
-    core::{IInspectable, HSTRING},
     Data::Xml::Dom::XmlDocument,
     Foundation::{EventRegistrationToken, TypedEventHandler},
     UI::Notifications::{ToastNotification, ToastNotificationManager},
+    core::{HSTRING, IInspectable},
 };
 
 use crate::{

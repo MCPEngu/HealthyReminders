@@ -9,8 +9,8 @@ mod tray;
 
 use std::{
     sync::{
-        mpsc::{self, Sender},
         Mutex, OnceLock,
+        mpsc::{self, Sender},
     },
     thread,
 };
@@ -22,15 +22,15 @@ use tao::{
     platform::windows::{WindowBuilderExtWindows, WindowExtWindows},
     window::WindowBuilder,
 };
-use tray_icon::{menu::MenuEvent, MouseButton, MouseButtonState, TrayIcon, TrayIconEvent};
+use tray_icon::{MouseButton, MouseButtonState, TrayIcon, TrayIconEvent, menu::MenuEvent};
 use windows::Win32::{
     Foundation::{HANDLE, HWND, LPARAM, LRESULT, WAIT_OBJECT_0, WPARAM},
     System::RemoteDesktop::{
-        WTSRegisterSessionNotification, WTSUnRegisterSessionNotification, NOTIFY_FOR_THIS_SESSION,
+        NOTIFY_FOR_THIS_SESSION, WTSRegisterSessionNotification, WTSUnRegisterSessionNotification,
     },
-    System::Threading::{WaitForSingleObject, INFINITE},
+    System::Threading::{INFINITE, WaitForSingleObject},
     UI::WindowsAndMessaging::{
-        CallWindowProcW, DefWindowProcW, SetWindowLongPtrW, GWLP_WNDPROC, WM_ENDSESSION,
+        CallWindowProcW, DefWindowProcW, GWLP_WNDPROC, SetWindowLongPtrW, WM_ENDSESSION,
         WM_QUERYENDSESSION, WM_WTSSESSION_CHANGE, WNDPROC,
     },
 };
@@ -160,10 +160,10 @@ fn run_app() -> Result<()> {
         stats_path: paths.stats_path,
     });
 
-    if !core::launch_minimized_arg() {
-        if let Some(runtime_ref) = runtime.as_ref() {
-            open_settings(runtime_ref);
-        }
+    if !core::launch_minimized_arg()
+        && let Some(runtime_ref) = runtime.as_ref()
+    {
+        open_settings(runtime_ref);
     }
 
     core::debounce_trim();
@@ -230,10 +230,10 @@ fn run_app() -> Result<()> {
                 unsafe {
                     let _ = WTSUnRegisterSessionNotification(hwnd);
                 }
-                if let Some(lock) = EVENT_PROXY.get() {
-                    if let Ok(mut slot) = lock.lock() {
-                        *slot = None;
-                    }
+                if let Some(lock) = EVENT_PROXY.get()
+                    && let Ok(mut slot) = lock.lock()
+                {
+                    *slot = None;
                 }
             }
             _ => {}
@@ -304,13 +304,15 @@ fn should_open_settings(event: &TrayIconEvent) -> bool {
 fn spawn_activation_watcher(event_handle: isize, proxy: EventLoopProxy<UserEvent>) -> Result<()> {
     thread::Builder::new()
         .name("ActivationWatcher".to_owned())
-        .spawn(move || loop {
-            let wait_result = unsafe { WaitForSingleObject(HANDLE(event_handle), INFINITE) };
-            if wait_result != WAIT_OBJECT_0 {
-                break;
-            }
-            if proxy.send_event(UserEvent::OpenSettings).is_err() {
-                break;
+        .spawn(move || {
+            loop {
+                let wait_result = unsafe { WaitForSingleObject(HANDLE(event_handle), INFINITE) };
+                if wait_result != WAIT_OBJECT_0 {
+                    break;
+                }
+                if proxy.send_event(UserEvent::OpenSettings).is_err() {
+                    break;
+                }
             }
         })
         .context("failed to spawn ActivationWatcher")?;
@@ -348,21 +350,20 @@ unsafe extern "system" fn healthy_reminders_wnd_proc(
         _ => {}
     }
 
-    if let Some(original) = ORIGINAL_WNDPROC.get().copied() {
-        if original != 0 {
-            let proc: WNDPROC = std::mem::transmute(original);
-            return CallWindowProcW(proc, hwnd, msg, wparam, lparam);
-        }
+    if let Some(original) = ORIGINAL_WNDPROC.get().copied()
+        && original != 0
+    {
+        let proc: WNDPROC = unsafe { std::mem::transmute(original) };
+        return unsafe { CallWindowProcW(proc, hwnd, msg, wparam, lparam) };
     }
-    DefWindowProcW(hwnd, msg, wparam, lparam)
+    unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) }
 }
 
 fn send_user_event(event: UserEvent) {
-    if let Some(lock) = EVENT_PROXY.get() {
-        if let Ok(slot) = lock.lock() {
-            if let Some(proxy) = slot.as_ref() {
-                let _ = proxy.send_event(event);
-            }
-        }
+    if let Some(lock) = EVENT_PROXY.get()
+        && let Ok(slot) = lock.lock()
+        && let Some(proxy) = slot.as_ref()
+    {
+        let _ = proxy.send_event(event);
     }
 }

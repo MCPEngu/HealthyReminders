@@ -1,29 +1,28 @@
 use std::{sync::mpsc::Sender, thread};
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 use windows::{
-    core::PCWSTR,
     Win32::{
         Foundation::{BOOL, COLORREF, HINSTANCE, HWND, LPARAM, LRESULT, RECT, WPARAM},
         Graphics::Gdi::{
-            BeginPaint, CreateFontW, CreateSolidBrush, DeleteObject, DrawTextW, EndPaint, FillRect,
-            GetStockObject, SelectObject, SetBkMode, SetTextColor, CLEARTYPE_QUALITY,
-            CLIP_DEFAULT_PRECIS, DEFAULT_CHARSET, DEFAULT_GUI_FONT, DEFAULT_PITCH, DT_CENTER,
-            DT_NOPREFIX, DT_SINGLELINE, DT_VCENTER, DT_WORDBREAK, HDC, OUT_DEFAULT_PRECIS,
-            PAINTSTRUCT, TRANSPARENT,
+            BeginPaint, CLEARTYPE_QUALITY, CLIP_DEFAULT_PRECIS, CreateFontW, CreateSolidBrush,
+            DEFAULT_CHARSET, DEFAULT_GUI_FONT, DEFAULT_PITCH, DT_CENTER, DT_NOPREFIX,
+            DT_SINGLELINE, DT_VCENTER, DT_WORDBREAK, DeleteObject, DrawTextW, EndPaint, FillRect,
+            GetStockObject, HDC, OUT_DEFAULT_PRECIS, PAINTSTRUCT, SelectObject, SetBkMode,
+            SetTextColor, TRANSPARENT,
         },
         System::LibraryLoader::GetModuleHandleW,
         UI::WindowsAndMessaging::{
-            CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW, GetClientRect,
-            GetMessageW, GetSystemMetrics, GetWindowLongPtrW, KillTimer, LoadCursorW,
-            PostQuitMessage, RegisterClassW, SendMessageW, SetForegroundWindow, SetTimer,
-            SetWindowLongPtrW, SetWindowTextW, ShowWindow, TranslateMessage, CREATESTRUCTW,
-            GWLP_USERDATA, HMENU, IDC_ARROW, MSG, SM_CXSCREEN, SM_CYSCREEN, SW_SHOW, WM_COMMAND,
-            WM_DESTROY, WM_NCCREATE, WM_NCDESTROY, WM_PAINT, WM_SETFONT, WM_TIMER, WNDCLASSW,
-            WS_CHILD, WS_CLIPCHILDREN, WS_CLIPSIBLINGS, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_POPUP,
-            WS_TABSTOP, WS_VISIBLE,
+            CREATESTRUCTW, CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW,
+            GWLP_USERDATA, GetClientRect, GetMessageW, GetSystemMetrics, GetWindowLongPtrW, HMENU,
+            IDC_ARROW, KillTimer, LoadCursorW, MSG, PostQuitMessage, RegisterClassW, SM_CXSCREEN,
+            SM_CYSCREEN, SW_SHOW, SendMessageW, SetForegroundWindow, SetTimer, SetWindowLongPtrW,
+            SetWindowTextW, ShowWindow, TranslateMessage, WM_COMMAND, WM_DESTROY, WM_NCCREATE,
+            WM_NCDESTROY, WM_PAINT, WM_SETFONT, WM_TIMER, WNDCLASSW, WS_CHILD, WS_CLIPCHILDREN,
+            WS_CLIPSIBLINGS, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_POPUP, WS_TABSTOP, WS_VISIBLE,
         },
     },
+    core::PCWSTR,
 };
 
 use crate::{

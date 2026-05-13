@@ -2,8 +2,8 @@ use std::{cell::RefCell, path::Path};
 
 use anyhow::{Context, Result};
 use tray_icon::{
-    menu::{CheckMenuItem, Menu, MenuId, MenuItem, PredefinedMenuItem},
     Icon, TrayIcon, TrayIconBuilder,
+    menu::{CheckMenuItem, Menu, MenuId, MenuItem, PredefinedMenuItem},
 };
 
 use crate::core;
