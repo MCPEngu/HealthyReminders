@@ -1,6 +1,6 @@
 # HealthyReminders
 
-A reminders app to notify you to drink water, rest your eyes, and stand up.
+A lightweight healthy reminders app to notify you to drink water, rest your eyes, and stand up written in Rust for Windows.
 
 ## Requirements
 
