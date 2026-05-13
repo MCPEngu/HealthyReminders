@@ -27,7 +27,7 @@ notify = "8"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tao = "0.35"
-tray-icon = "0.22"
+tray-icon = "0.24"
 windows = { version = "0.61", features = [
     "Data_Xml_Dom",
     "Foundation",
