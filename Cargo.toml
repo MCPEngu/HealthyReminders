@@ -1,0 +1,58 @@
+[package]
+name = "healthy_reminders"
+version = "0.1.0"
+edition = "2021"
+authors = ["MCPEngu1"]
+description = "Windows app reminders for hydration, eye rest, and movement breaks"
+license = "MIT"
+build = "build.rs"
+
+[[bin]]
+name = "HealthyReminders"
+path = "src/main.rs"
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "unwind"
+strip = true
+
+[dependencies]
+anyhow = "1"
+chrono = { version = "0.4", default-features = false, features = ["clock", "serde"] }
+flexi_logger = { version = "0.29", features = ["compress"] }
+log = "0.4"
+notify = "8"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tao = "0.35"
+tray-icon = "0.22"
+windows = { version = "0.52", features = [
+    "Data_Xml_Dom",
+    "Foundation",
+    "Foundation_Collections",
+    "UI_Notifications",
+    "Win32_Foundation",
+    "Win32_Graphics_Dwm",
+    "Win32_Graphics_Gdi",
+    "Win32_Security",
+    "Win32_System_Com",
+    "Win32_System_Com_StructuredStorage",
+    "Win32_System_LibraryLoader",
+    "Win32_System_ProcessStatus",
+    "Win32_System_Registry",
+    "Win32_System_RemoteDesktop",
+    "Win32_Storage_FileSystem",
+    "Win32_System_Threading",
+    "Win32_System_Variant",
+    "Win32_UI_Controls",
+    "Win32_UI_HiDpi",
+    "Win32_System_WinRT",
+    "Win32_UI_Shell",
+    "Win32_UI_Shell_PropertiesSystem",
+    "Win32_UI_WindowsAndMessaging"
+] }
+
+[build-dependencies]
+winres = "0.1"
