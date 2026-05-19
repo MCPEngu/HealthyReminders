@@ -1,7 +1,7 @@
 pub(super) const CLASS_NAME: &str = "HealthyRemindersSettingsWindow";
 pub(super) const APP_ICON_RESOURCE_ID: usize = 1;
 pub(super) const SETTINGS_WINDOW_WIDTH: i32 = 760;
-pub(super) const SETTINGS_WINDOW_HEIGHT: i32 = 640;
+pub(super) const SETTINGS_WINDOW_HEIGHT: i32 = 740;
 
 pub(super) const ID_WATER_MINUTES: i32 = 101;
 pub(super) const ID_EYE_MINUTES: i32 = 102;

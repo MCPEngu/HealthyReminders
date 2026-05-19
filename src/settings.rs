@@ -70,6 +70,8 @@ const STANDARD_DPI: u32 = 96;
 const COMFORT_DPI: u32 = 120;
 const HIGH_RES_MONITOR_WIDTH: i32 = 2300;
 const HIGH_RES_MONITOR_HEIGHT: i32 = 1300;
+const PAGE_CONTENT_Y_OFFSET: i32 = 70;
+const SETTINGS_FONT_POINT_SIZE_TENTHS: i32 = 85;
 
 #[derive(Clone, Copy)]
 struct SettingsFont {
@@ -345,7 +347,7 @@ fn effective_ui_dpi(hwnd: HWND) -> u32 {
     if is_high_resolution_monitor(hwnd) {
         window_dpi.max(COMFORT_DPI)
     } else {
-        window_dpi
+        STANDARD_DPI
     }
 }
 
@@ -1256,10 +1258,10 @@ fn create_controls(parent: HWND) -> Result<()> {
 fn layout_settings_controls(parent: HWND) {
     for (id, x, y, width, height) in [
         (ID_SECTION_TODAY, 24, 16, 120, 20),
-        (ID_DASHBOARD, 40, 44, 410, 90),
-        (ID_WATER_CHART, 480, 44, 240, 104),
-        (ID_SAVE, 40, 516, 100, 30),
-        (ID_STATUS, 24, 566, 696, 22),
+        (ID_DASHBOARD, 40, 44, 410, 126),
+        (ID_WATER_CHART, 480, 44, 240, 160),
+        (ID_SAVE, 40, 560, 100, 30),
+        (ID_STATUS, 24, 622, 696, 22),
     ] {
         move_control(parent, id, x, y, width, height);
     }
@@ -1355,6 +1357,13 @@ fn move_control(parent: HWND, id: i32, x: i32, y: i32, width: i32, height: i32) 
     if hwnd.0 == 0 {
         return;
     }
+
+    let y = if ALL_PAGE_IDS.contains(&id) {
+        y + PAGE_CONTENT_Y_OFFSET
+    } else {
+        y
+    };
+
     unsafe {
         let _ = SetWindowPos(
             hwnd,
@@ -1647,7 +1656,8 @@ fn install_settings_menu(hwnd: HWND, language: core::Language) -> Result<()> {
 }
 
 fn append_menu_item(menu: HMENU, flags: MENU_ITEM_FLAGS, id: usize, text: &str) -> Result<()> {
-    let text = core::wide_null(text);
+    let title = format!("  {text}  ");
+    let text = core::wide_null(title.as_str());
     unsafe { AppendMenuW(menu, flags, id, PCWSTR(text.as_ptr())) }.context("AppendMenuW failed")
 }
 
@@ -2238,9 +2248,6 @@ fn lock_settings(
 
 pub(super) fn settings_font_handle(parent: HWND) -> isize {
     let dpi = effective_ui_dpi(parent);
-    if dpi <= STANDARD_DPI {
-        return unsafe { GetStockObject(DEFAULT_GUI_FONT) }.0;
-    }
 
     let lock = SETTINGS_FONTS.get_or_init(|| Mutex::new(Vec::new()));
     let mut guard = match lock.lock() {
@@ -2253,7 +2260,7 @@ pub(super) fn settings_font_handle(parent: HWND) -> isize {
     }
 
     let face = core::wide_null("Segoe UI");
-    let height = -((9 * dpi as i32 + 36) / 72);
+    let height = -((SETTINGS_FONT_POINT_SIZE_TENTHS * dpi as i32 + 360) / 720);
     let font = unsafe {
         CreateFontW(
             height,
