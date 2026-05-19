@@ -342,10 +342,10 @@ fn scale_value_for_dpi(value: i32, dpi: u32) -> i32 {
 
 fn effective_ui_dpi(hwnd: HWND) -> u32 {
     let window_dpi = unsafe { GetDpiForWindow(hwnd) }.max(STANDARD_DPI);
-    if window_dpi <= STANDARD_DPI && is_high_resolution_monitor(hwnd) {
-        COMFORT_DPI
+    if is_high_resolution_monitor(hwnd) {
+        window_dpi.max(COMFORT_DPI)
     } else {
-        STANDARD_DPI
+        window_dpi
     }
 }
 
