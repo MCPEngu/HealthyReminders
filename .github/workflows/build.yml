@@ -251,7 +251,7 @@ jobs:
           cat > target/package/build-rhel-rpm.sh <<'RPM_SCRIPT'
           set -euo pipefail
 
-          dnf -y install ca-certificates curl gcc glibc-devel rpm-build tar gzip
+          dnf -y install ca-certificates gcc glibc-devel rpm-build tar gzip
           curl --proto "=https" --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain stable
           . "$HOME/.cargo/env"
 
