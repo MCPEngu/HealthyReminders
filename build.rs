@@ -1,5 +1,7 @@
 fn main() {
-    if !cfg!(target_os = "windows") {
+    println!("cargo:rerun-if-env-changed=CARGO_CFG_TARGET_OS");
+
+    if std::env::var("CARGO_CFG_TARGET_OS").as_deref() != Ok("windows") {
         return;
     }
 

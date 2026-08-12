@@ -7,7 +7,7 @@ use std::{
     panic,
     path::{Path, PathBuf},
     process,
-    sync::mpsc::Sender,
+    sync::{Mutex, mpsc::Sender},
     thread,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
@@ -72,6 +72,7 @@ const PERSONALIZE_KEY: &str = r"Software\Microsoft\Windows\CurrentVersion\Themes
 const APPS_USE_LIGHT_THEME: &str = "AppsUseLightTheme";
 const MUTEX_NAME: &str = "HealthyReminders_Global_Mutex";
 const ACTIVATION_EVENT_NAME: &str = "HealthyReminders_Open_Settings_Event";
+static STATS_UPDATE_LOCK: Mutex<()> = Mutex::new(());
 const PKEY_APP_USER_MODEL_ID: PROPERTYKEY = PROPERTYKEY {
     fmtid: windows::core::GUID::from_u128(0x9f4c2855_9f79_4b39_a8d0_e1d42de1d5f3),
     pid: 5,
@@ -452,6 +453,9 @@ pub fn save_stats(path: &Path, stats: &AppStats) -> Result<()> {
 }
 
 pub fn record_activity(path: &Path, activity: ActivityKind) -> Result<DailyStats> {
+    let _update_guard = STATS_UPDATE_LOCK
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
     let mut stats = load_stats(path);
     let today = today_date_string();
     let index = stats
@@ -1271,5 +1275,43 @@ impl Drop for RegKey {
         unsafe {
             let _ = RegCloseKey(self.0);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::{Arc, Barrier};
+
+    #[test]
+    fn concurrent_activity_updates_are_not_lost() {
+        let dir = env::temp_dir().join(unique_temp_file_name("concurrent-stats-test"));
+        fs::create_dir_all(&dir).expect("test directory should be created");
+        let stats_path = dir.join(STATS_FILE_NAME);
+        save_stats(&stats_path, &AppStats::default()).expect("initial stats should be saved");
+
+        let workers = 8;
+        let barrier = Arc::new(Barrier::new(workers));
+        let handles: Vec<_> = (0..workers)
+            .map(|_| {
+                let barrier = Arc::clone(&barrier);
+                let stats_path = stats_path.clone();
+                thread::spawn(move || {
+                    barrier.wait();
+                    record_activity(&stats_path, ActivityKind::Water { ml: 250 })
+                        .expect("activity should be recorded");
+                })
+            })
+            .collect();
+
+        for handle in handles {
+            handle.join().expect("worker should not panic");
+        }
+
+        let today = today_stats(&stats_path);
+        assert_eq!(today.water_ml, workers as u64 * 250);
+        assert_eq!(today.water_glasses, workers as u64);
+
+        let _ = fs::remove_dir_all(dir);
     }
 }

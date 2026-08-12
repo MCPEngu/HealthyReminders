@@ -16,7 +16,7 @@ on:
         type: string
 
 permissions:
-  contents: write
+  contents: read
 
 env:
   CARGO_TERM_COLOR: always
@@ -36,12 +36,19 @@ jobs:
       - name: Resolve release tag
         if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.tag != '')
         shell: pwsh
+        env:
+          REQUESTED_TAG: ${{ inputs.tag }}
+          REF_NAME: ${{ github.ref_name }}
         run: |
-          if ("${{ github.event_name }}" -eq "workflow_dispatch") {
-            "RELEASE_TAG=${{ inputs.tag }}" | Out-File -FilePath $env:GITHUB_ENV -Append
+          if ($env:GITHUB_EVENT_NAME -eq "workflow_dispatch") {
+            $tag = $env:REQUESTED_TAG
           } else {
-            "RELEASE_TAG=${{ github.ref_name }}" | Out-File -FilePath $env:GITHUB_ENV -Append
+            $tag = $env:REF_NAME
           }
+          if ($tag -notmatch '^v[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$') {
+            throw "Release tag must be a semantic version such as v0.2.0."
+          }
+          "RELEASE_TAG=$tag" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       - name: Checkout release tag
         if: github.event_name == 'workflow_dispatch' && inputs.tag != ''
@@ -68,6 +75,16 @@ jobs:
         with:
           key: ${{ runner.os }}-${{ env.TARGET }}
 
+      - name: Validate release version
+        if: env.RELEASE_TAG != ''
+        shell: pwsh
+        run: |
+          $metadata = cargo metadata --locked --no-deps --format-version 1 | ConvertFrom-Json
+          $packageVersion = $metadata.packages[0].version
+          if ($env:RELEASE_TAG.Substring(1) -ne $packageVersion) {
+            throw "Release tag $env:RELEASE_TAG does not match package version $packageVersion."
+          }
+
       - name: Check formatting
         run: cargo fmt -- --check
 
@@ -90,24 +107,259 @@ jobs:
           New-Item -ItemType Directory -Force dist | Out-Null
           Copy-Item "target\$env:TARGET\release\HealthyReminders.exe" "dist\HealthyReminders-$env:RELEASE_TAG-windows-x64.exe"
 
-      - name: Publish GitHub Release
+      - name: Upload Windows release artifact
         if: env.RELEASE_TAG != ''
-        shell: pwsh
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: healthy-reminders-windows
+          path: dist/*
+          if-no-files-found: error
+
+  linux:
+    name: Linux build and release
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      TARGET: x86_64-unknown-linux-gnu
+      PACKAGE_NAME: healthy-reminders
+      BINARY_NAME: HealthyReminders
+      RPM_IMAGE: rockylinux:9
+
+    steps:
+      - name: Resolve release tag
+        if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.tag != '')
+        shell: bash
+        env:
+          REQUESTED_TAG: ${{ inputs.tag }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            tag="$REQUESTED_TAG"
+          else
+            tag="$REF_NAME"
+          fi
+          if [[ ! "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$ ]]; then
+            echo "Release tag must be a semantic version such as v0.2.0." >&2
+            exit 1
+          fi
+          echo "RELEASE_TAG=$tag" >> "$GITHUB_ENV"
+
+      - name: Checkout release tag
+        if: github.event_name == 'workflow_dispatch' && inputs.tag != ''
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          ref: ${{ inputs.tag }}
+          persist-credentials: false
+
+      - name: Checkout
+        if: github.event_name != 'workflow_dispatch' || inputs.tag == ''
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+        with:
+          toolchain: stable
+          targets: ${{ env.TARGET }}
+          components: clippy
+
+      - name: Cache Cargo
+        uses: Swatinem/rust-cache@42dc69e1aa15d09112580998cf2ef0119e2e91ae # v2
+        with:
+          key: ${{ runner.os }}-${{ env.TARGET }}
+
+      - name: Resolve package metadata
+        shell: bash
+        run: |
+          python3 <<'PY' >> "$GITHUB_ENV"
+          import os
+          import tomllib
+
+          with open("Cargo.toml", "rb") as manifest:
+              package = tomllib.load(manifest)["package"]
+
+          release_tag = os.environ.get("RELEASE_TAG")
+          if release_tag and release_tag.removeprefix("v") != package["version"]:
+              raise SystemExit(
+                  f"Release tag {release_tag} does not match package version {package['version']}."
+              )
+
+          print(f"PACKAGE_VERSION={package['version']}")
+          print(f"PACKAGE_SUMMARY={package['description']}")
+          PY
+
+      - name: Install packaging tools
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y rpm
+
+      - name: Check
+        run: cargo check --locked --target "$TARGET"
+
+      - name: Test
+        run: cargo test --locked --target "$TARGET"
+
+      - name: Clippy
+        run: cargo clippy --locked --target "$TARGET" -- -D warnings
+
+      - name: Build app
+        run: cargo build --locked --release --target "$TARGET"
+
+      - name: Package Debian artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          artifact_version="${RELEASE_TAG:-v${PACKAGE_VERSION}}"
+          binary="target/${TARGET}/release/${BINARY_NAME}"
+
+          mkdir -p dist
+          cp "$binary" "dist/${BINARY_NAME}-${artifact_version}-linux-x64"
+          chmod +x "dist/${BINARY_NAME}-${artifact_version}-linux-x64"
+
+          deb_root="target/package/deb/${PACKAGE_NAME}_${PACKAGE_VERSION}_amd64"
+          rm -rf "$deb_root"
+          install -D -m 0755 "$binary" "$deb_root/usr/bin/${BINARY_NAME}"
+          install -D -m 0644 README.md "$deb_root/usr/share/doc/${PACKAGE_NAME}/README.md"
+          install -D -m 0644 LICENSE "$deb_root/usr/share/doc/${PACKAGE_NAME}/copyright"
+          mkdir -p "$deb_root/DEBIAN"
+          cat > "$deb_root/DEBIAN/control" <<EOF
+          Package: ${PACKAGE_NAME}
+          Version: ${PACKAGE_VERSION}
+          Section: utils
+          Priority: optional
+          Architecture: amd64
+          Maintainer: MCPEngu1 <noreply@users.noreply.github.com>
+          Depends: libnotify-bin
+          Description: ${PACKAGE_SUMMARY}
+           Background reminders for hydration, eye rest, and movement breaks.
+          EOF
+          deb_asset="dist/${PACKAGE_NAME}_${PACKAGE_VERSION}_amd64.deb"
+          dpkg-deb --build --root-owner-group "$deb_root" "$deb_asset"
+          dpkg-deb --info "$deb_asset"
+          dpkg-deb --contents "$deb_asset" | grep -F "./usr/bin/${BINARY_NAME}"
+
+      - name: Package RHEL RPM artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          mkdir -p target/package
+          cat > target/package/build-rhel-rpm.sh <<'RPM_SCRIPT'
+          set -euo pipefail
+
+          dnf -y install ca-certificates gcc glibc-devel rpm-build tar gzip
+          curl --proto "=https" --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain stable
+          . "$HOME/.cargo/env"
+
+          export CARGO_TARGET_DIR=target/rhel
+          cargo build --locked --release --target "$TARGET"
+
+          binary="${CARGO_TARGET_DIR}/${TARGET}/release/${BINARY_NAME}"
+          rpm_top="$PWD/target/package/rpm-rhel"
+          rpm_source_root="$PWD/target/package/rpm-source-rhel/${PACKAGE_NAME}-${PACKAGE_VERSION}"
+          rm -rf "$rpm_top" "$rpm_source_root"
+          mkdir -p "$rpm_top/BUILD" "$rpm_top/BUILDROOT" "$rpm_top/RPMS" "$rpm_top/SOURCES" "$rpm_top/SPECS" "$rpm_top/SRPMS"
+          install -D -m 0755 "$binary" "$rpm_source_root/usr/bin/${BINARY_NAME}"
+          cp README.md LICENSE "$rpm_source_root/"
+          tar -C "$(dirname "$rpm_source_root")" -czf "$rpm_top/SOURCES/${PACKAGE_NAME}-${PACKAGE_VERSION}.tar.gz" "${PACKAGE_NAME}-${PACKAGE_VERSION}"
+          cat > "$rpm_top/SPECS/${PACKAGE_NAME}.spec" <<SPEC
+          %global debug_package %{nil}
+          Name:           ${PACKAGE_NAME}
+          Version:        ${PACKAGE_VERSION}
+          Release:        1%{?dist}
+          Summary:        ${PACKAGE_SUMMARY}
+          License:        MIT
+          URL:            https://github.com/MCPEngu/HealthyReminders
+          Source0:        %{name}-%{version}.tar.gz
+          Requires:       libnotify
+
+          %description
+          Background reminders for hydration, eye rest, and movement breaks.
+
+          %prep
+          %setup -q
+
+          %build
+
+          %install
+          mkdir -p %{buildroot}
+          cp -a usr %{buildroot}/usr
+
+          %files
+          %license LICENSE
+          %doc README.md
+          /usr/bin/${BINARY_NAME}
+          SPEC
+          rpmbuild --define "_topdir ${rpm_top}" -bb "$rpm_top/SPECS/${PACKAGE_NAME}.spec"
+          mkdir -p dist
+          cp "$rpm_top"/RPMS/x86_64/*.rpm dist/
+          chown -R "${HOST_UID}:${HOST_GID}" target/rhel target/package/rpm-rhel target/package/rpm-source-rhel dist
+          RPM_SCRIPT
+
+          docker run --rm \
+            -e CARGO_TERM_COLOR=always \
+            -e TARGET \
+            -e PACKAGE_NAME \
+            -e PACKAGE_VERSION \
+            -e PACKAGE_SUMMARY \
+            -e BINARY_NAME \
+            -e HOST_UID="$(id -u)" \
+            -e HOST_GID="$(id -g)" \
+            -v "$PWD:/work" \
+            -w /work \
+            "$RPM_IMAGE" \
+            bash target/package/build-rhel-rpm.sh
+
+          rpm -qpi dist/*.rpm
+          rpm -qpl dist/*.rpm | grep -F "/usr/bin/${BINARY_NAME}"
+
+      - name: Upload Linux release artifacts
+        if: env.RELEASE_TAG != ''
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: healthy-reminders-linux
+          path: dist/*
+          if-no-files-found: error
+
+  publish:
+    name: Publish complete release
+    if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.tag != '')
+    needs: [windows, linux]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    env:
+      RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+
+    steps:
+      - name: Download release artifacts
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: healthy-reminders-*
+          path: dist
+          merge-multiple: true
+
+      - name: Publish GitHub Release
+        shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          $asset = "dist\HealthyReminders-$env:RELEASE_TAG-windows-x64.exe"
-          gh release view "$env:RELEASE_TAG" *> $null
-          if ($LASTEXITCODE -eq 0) {
-            $oldZip = "HealthyReminders-$env:RELEASE_TAG-windows-x64.zip"
-            try {
-              gh release delete-asset "$env:RELEASE_TAG" "$oldZip" --yes *> $null
-            } catch {
-            }
-            gh release upload "$env:RELEASE_TAG" "$asset" --clobber
-          } else {
-            gh release create "$env:RELEASE_TAG" "$asset" `
-              --title "HealthyReminders $env:RELEASE_TAG" `
-              --generate-notes `
+          set -euo pipefail
+          assets=(dist/*)
+          if [ "${#assets[@]}" -lt 4 ]; then
+            echo "Expected Windows binary, Linux binary, DEB, and RPM artifacts." >&2
+            exit 1
+          fi
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" "${assets[@]}" --clobber
+          else
+            gh release create "$RELEASE_TAG" "${assets[@]}" \
+              --title "HealthyReminders $RELEASE_TAG" \
+              --generate-notes \
               --verify-tag
-          }
+          fi
