@@ -1,22 +1,33 @@
 # HealthyReminders
 
-A lightweight healthy reminders app to notify you to drink water, rest your eyes, and stand up written in Rust for Windows.
+A lightweight reminders app for hydration, eye rest, and movement breaks on Windows/Linux.
 
 ## Requirements
 
-- Windows 10/11.
-- Rust stable with the `x86_64-pc-windows-msvc` target.
-- Visual Studio Build Tools with MSVC toolchain and Windows SDK.
+- Rust stable.
+- Windows builds: `x86_64-pc-windows-msvc`, Visual Studio Build Tools, and Windows SDK.
+- Linux builds: `x86_64-unknown-linux-gnu` and a desktop notification provider such as `libnotify`.
 
 ## Build
+
+Windows:
 
 ```powershell
 rustup target add x86_64-pc-windows-msvc
 cargo build --release --target x86_64-pc-windows-msvc
 ```
 
-The binary file is located at:
+Linux:
+
+```bash
+rustup target add x86_64-unknown-linux-gnu
+cargo build --release --target x86_64-unknown-linux-gnu
+```
+
+The binaries are located at:
 
 ```text
-target\x86_64-pc-windows-msvc\release\HealthyReminders.exe
+Windows: target\x86_64-pc-windows-msvc\release\HealthyReminders.exe
+
+Linux: target/x86_64-unknown-linux-gnu/release/HealthyReminders
 ```
