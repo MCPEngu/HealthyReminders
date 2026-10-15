@@ -1,0 +1,15 @@
+Jenkinsfile
+  h_3cc162daaa79de 11-12,22,26-27,32,34-49,53,55-66,89
+  h_3cc162daaa79de 95
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "309d7ee8aa6df8dbcc1cf20cafd4c8ed21d80e78",
+  "prompts": {},
+  "humans": {
+    "h_3cc162daaa79de": {
+      "author": "Hai Tran <hoanghaivn0406@gmail.com>"
+    }
+  }
+}
