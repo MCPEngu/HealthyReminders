@@ -1,0 +1,14 @@
+build.rs
+  h_3cc162daaa79de 69
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "b131dd0413d406f44329521f8bd8dff8e1241d6b",
+  "prompts": {},
+  "humans": {
+    "h_3cc162daaa79de": {
+      "author": "Hai Tran <hoanghaivn0406@gmail.com>"
+    }
+  }
+}
