@@ -32,8 +32,8 @@ pipeline {
         stage('Lint Check (Windows)') {
             steps {
                 sh '''
-                    cargo check --locked --target "$WIN_TARGET"
-                    cargo clippy --locked --target "$WIN_TARGET" -- -D warnings
+                    cargo xwin check --locked --target "$WIN_TARGET"
+                    cargo xwin clippy --locked --target "$WIN_TARGET" -- -D warnings
                 '''
             }
         }

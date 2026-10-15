@@ -1,9 +1,20 @@
 fn main() {
+    println!("cargo:rerun-if-changed=build.rs");
+    println!("cargo:rerun-if-changed=icon.ico");
     println!("cargo:rerun-if-env-changed=CARGO_CFG_TARGET_OS");
+    println!("cargo:rerun-if-env-changed=HOST");
+    println!("cargo:rerun-if-env-changed=TARGET");
 
-    if std::env::var("CARGO_CFG_TARGET_OS").as_deref() != Ok("windows") {
+    if std::env::var("CARGO_CFG_TARGET_OS").unwrap_or_default() != "windows" {
         return;
     }
+
+    let host = std::env::var("HOST").unwrap_or_default();
+    let target = std::env::var("TARGET").unwrap_or_default();
+    // build.rs always runs on HOST; CARGO_CFG_TARGET_OS/TARGET tell us what we build FOR.
+    // When HOST is Linux but TARGET is Windows (cross via plain cargo),
+    // rc.exe is missing -> downgrade failure to warning below.
+    let host_is_windows = host.to_lowercase().contains("windows");
 
     let mut res = winres::WindowsResource::new();
     res.set_icon("icon.ico");
@@ -48,6 +59,16 @@ fn main() {
     );
 
     if let Err(error) = res.compile() {
-        panic!("failed to compile Windows resource: {error}");
+        if host_is_windows {
+            eprintln!("failed to compile Windows resource: {error}");
+            std::process::exit(1);
+        } else {
+            // Cross-compile from Linux without rc.exe/llvm-rc (plain `cargo check --target windows-msvc`):
+            // don't fail the whole Jenkins Linux stage, just skip icon/manifest.
+            // `cargo xwin` provides a working RC, so real Windows releases still get the icon.
+            println!(
+                "cargo:warning=skipping Windows resource on {host} for {target}: {error}"
+            );
+        }
     }
 }
