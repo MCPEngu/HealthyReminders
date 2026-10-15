@@ -1,0 +1,18 @@
+.gitignore
+  h_3cc162daaa79de 32-34
+Jenkinsfile
+  h_3cc162daaa79de 1-70
+sonar-project.properties
+  h_3cc162daaa79de 1-8
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "568c1f06221a8c5f4848aa3ae809e5700ef200f1",
+  "prompts": {},
+  "humans": {
+    "h_3cc162daaa79de": {
+      "author": "Hai Tran <hoanghaivn0406@gmail.com>"
+    }
+  }
+}
