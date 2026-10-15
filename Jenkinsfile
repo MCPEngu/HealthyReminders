@@ -8,7 +8,8 @@ pipeline {
         SCANNER_HOME = tool 'SonarScanner'
         PATH = "/home/jenkins/.cargo/bin:${env.PATH}"
         CARGO_TERM_COLOR = 'always'
-        TARGET = 'x86_64-unknown-linux-gnu'
+        LINUX_TARGET = 'x86_64-unknown-linux-gnu'
+        WIN_TARGET = 'x86_64-pc-windows-msvc'
     }
 
     stages {
@@ -18,27 +19,51 @@ pipeline {
             }
         }
 
-        stage('Format, Check & Clippy') {
+        stage('Format & Lint Check (Linux)') {
             steps {
                 sh '''
-                    cargo --version
-                    rustc --version
                     cargo fmt -- --check
-                    cargo check --locked --target "$TARGET"
-                    cargo clippy --locked --target "$TARGET" -- -D warnings
+                    cargo check --locked --target "$LINUX_TARGET"
+                    cargo clippy --locked --target "$LINUX_TARGET" -- -D warnings
                 '''
             }
         }
 
-        stage('Unit Test') {
+        stage('Lint Check (Windows)') {
             steps {
-                sh 'cargo test --locked --target "$TARGET"'
+                sh '''
+                    cargo check --locked --target "$WIN_TARGET"
+                    cargo clippy --locked --target "$WIN_TARGET" -- -D warnings
+                '''
             }
         }
 
-        stage('Build Linux Release') {
+        stage('Unit Test (Linux)') {
             steps {
-                sh 'cargo build --locked --release --target "$TARGET"'
+                sh 'cargo test --locked --target "$LINUX_TARGET"'
+            }
+        }
+
+        stage('Unit Test (Windows)') {
+            steps {
+                sh 'cargo xwin test --locked --target "$WIN_TARGET" --no-run'
+            }
+        }
+
+        stage('Build Release Artifacts') {
+            steps {
+                sh '''
+                    mkdir -p dist
+
+                    echo "=== Building Linux Release ==="
+                    cargo build --locked --release --target "$LINUX_TARGET"
+                    cp "target/${LINUX_TARGET}/release/HealthyReminders" "dist/HealthyReminders-linux-x64"
+                    chmod +x "dist/HealthyReminders-linux-x64"
+
+                    echo "=== Building Windows Release ==="
+                    cargo xwin build --locked --release --target "$WIN_TARGET"
+                    cp "target/${WIN_TARGET}/release/HealthyReminders.exe" "dist/HealthyReminders-windows-x64.exe"
+                '''
             }
         }
 
@@ -61,7 +86,7 @@ pipeline {
 
     post {
         success {
-            archiveArtifacts artifacts: "target/${TARGET}/release/HealthyReminders", fingerprint: true
+            archiveArtifacts artifacts: 'dist/*', fingerprint: true
         }
         always {
             cleanWs()
