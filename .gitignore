@@ -29,3 +29,6 @@ rustc-ice-*.txt
 # Local history and workspace data
 .history/
 *.code-workspace
+
+# Zcode mimosa
+.mimosa/
