@@ -66,9 +66,7 @@ fn main() {
             // Cross-compile from Linux without rc.exe/llvm-rc (plain `cargo check --target windows-msvc`):
             // don't fail the whole Jenkins Linux stage, just skip icon/manifest.
             // `cargo xwin` provides a working RC, so real Windows releases still get the icon.
-            println!(
-                "cargo:warning=skipping Windows resource on {host} for {target}: {error}"
-            );
+            println!("cargo:warning=skipping Windows resource on {host} for {target}: {error}");
         }
     }
 }
