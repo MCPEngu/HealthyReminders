@@ -1,0 +1,19 @@
+docs/superpowers/specs/2026-10-15-windows-resource-build-design.md
+  s_485dfe48b0211b::t_13d6afc3f41a7a 1-25
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "3a9aa06f3d86aadccb4cd1a7bc9282dc35264253",
+  "prompts": {},
+  "sessions": {
+    "s_485dfe48b0211b": {
+      "agent_id": {
+        "tool": "github-copilot-cli",
+        "id": "4304c82e-8f71-4f1b-bed6-b5e488239666",
+        "model": "unknown"
+      },
+      "human_author": "Hai Tran <hoanghaivn0406@gmail.com>"
+    }
+  }
+}
